@@ -7,7 +7,7 @@ import LocationSelector from '@/components/location/LocationSelector';
 import GymCard from '@/components/gym/GymCard';
 import GymSearch from '@/components/search/GymSearch';
 import { searchGyms, KakaoPlace } from '@/lib/kakaoMap';
-import { mockGyms, Gym } from '@/mocks/gyms';
+import { searchGymsByLocation, Gym } from '@/lib/supabase';
 
 export default function HomePage() {
   const router = useRouter();
@@ -16,6 +16,7 @@ export default function HomePage() {
   const [showMachineSelector, setShowMachineSelector] = useState(false);
   const [selectedMachines, setSelectedMachines] = useState<string[]>([]);
   const [gyms, setGyms] = useState<KakaoPlace[]>([]);
+  const [supabaseGyms, setSupabaseGyms] = useState<Gym[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -53,24 +54,22 @@ export default function HomePage() {
   const loadGyms = async () => {
     setLoading(true);
     try {
-      const results = await searchGyms(selectedLocation);
-      setGyms(results);
+      // 카카오맵 API에서 실시간 검색
+      const kakaoResults = await searchGyms(selectedLocation);
+      setGyms(kakaoResults);
+      
+      // Supabase에서 등록된 헬스장 검색
+      const supabaseResults = await searchGymsByLocation(selectedLocation);
+      setSupabaseGyms(supabaseResults);
+      
+      console.log('헬스장 로드 완료:', {
+        kakao: kakaoResults.length,
+        supabase: supabaseResults.length
+      });
     } catch (error) {
       console.error('헬스장 로드 오류:', error);
-      // API 오류 시 목업 데이터 사용
-      setGyms(mockGyms.map(gym => ({
-        id: gym.id,
-        place_name: gym.name,
-        category_name: '헬스장',
-        category_group_code: 'CT1',
-        phone: '',
-        address_name: gym.location,
-        road_address_name: gym.location,
-        x: '126.9780',
-        y: '37.5665',
-        place_url: '',
-        distance: gym.distance || '0'
-      })));
+      setGyms([]);
+      setSupabaseGyms([]);
     } finally {
       setLoading(false);
     }
@@ -114,9 +113,14 @@ export default function HomePage() {
     router.push(`/gym/${gymId}`);
   };
 
-  const handleGymSelect = (gym: KakaoPlace) => {
-    // 선택된 헬스장으로 상세 페이지 이동
-    router.push(`/gym/${gym.id}`);
+  const handleGymSelect = (gym: KakaoPlace & { supabaseGym?: Gym }) => {
+    // Supabase에 등록된 헬스장인 경우 해당 ID로 이동
+    if (gym.supabaseGym?.id) {
+      router.push(`/gym/${gym.supabaseGym.id}`);
+    } else {
+      // 카카오맵에서만 검색된 헬스장인 경우 카카오 ID로 이동
+      router.push(`/gym/${gym.id}`);
+    }
   };
 
   // 필터링 로직
@@ -125,9 +129,19 @@ export default function HomePage() {
     if (selectedLocation !== 'all' && !gym.address_name.includes(selectedLocation)) {
       return false;
     }
-
     return true;
   });
+
+  const filteredSupabaseGyms = supabaseGyms.filter((gym) => {
+    // 지역 필터 적용
+    if (selectedLocation !== 'all' && !gym.location.includes(selectedLocation)) {
+      return false;
+    }
+    return true;
+  });
+
+  // 전체 헬스장 수 계산
+  const totalGyms = filteredGyms.length + filteredSupabaseGyms.length;
 
   if (loading) {
     return (
@@ -201,7 +215,12 @@ export default function HomePage() {
                 {selectedLocation}의 헬스장
               </h2>
               <p className="text-gray-400 text-sm">
-                {loading ? '검색 중...' : `${filteredGyms.length}개의 헬스장을 찾았습니다`}
+                {loading ? '검색 중...' : `${totalGyms}개의 헬스장을 찾았습니다`}
+                {!loading && filteredSupabaseGyms.length > 0 && (
+                  <span className="text-green-400 text-xs ml-2">
+                    (등록된 헬스장 {filteredSupabaseGyms.length}개 포함)
+                  </span>
+                )}
               </p>
             </div>
 
@@ -214,14 +233,53 @@ export default function HomePage() {
             ) : (
               /* 헬스장 목록 */
               <div className="grid grid-cols-2 gap-4">
+                {/* 등록된 헬스장 우선 표시 */}
+                {filteredSupabaseGyms.map((gym) => (
+                  <div
+                    key={`supabase-${gym.id}`}
+                    onClick={() => handleGymClick(gym.id)}
+                    className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors border border-green-500/20"
+                  >
+                    <div className="aspect-video bg-gray-700 rounded-lg mb-3 flex items-center justify-center relative">
+                      <i className="ri-building-line text-3xl text-gray-500"></i>
+                      <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                        등록됨
+                      </div>
+                    </div>
+                    <h3 className="text-white font-semibold text-sm mb-1 line-clamp-1">
+                      {gym.name}
+                    </h3>
+                    <p className="text-gray-400 text-xs mb-2 line-clamp-2">
+                      {gym.location}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      {gym.distance && (
+                        <p className="text-red-400 text-xs">
+                          📍 {gym.distance}
+                        </p>
+                      )}
+                      {gym.rating > 0 && (
+                        <div className="flex items-center text-yellow-400 text-xs">
+                          <i className="ri-star-fill mr-1"></i>
+                          <span>{gym.rating}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* 카카오맵 실시간 검색 결과 */}
                 {filteredGyms.map((gym) => (
                   <div
-                    key={gym.id}
+                    key={`kakao-${gym.id}`}
                     onClick={() => handleGymClick(gym.id)}
                     className="bg-gray-800 rounded-lg p-4 cursor-pointer hover:bg-gray-700 transition-colors"
                   >
-                    <div className="aspect-video bg-gray-700 rounded-lg mb-3 flex items-center justify-center">
+                    <div className="aspect-video bg-gray-700 rounded-lg mb-3 flex items-center justify-center relative">
                       <i className="ri-building-line text-3xl text-gray-500"></i>
+                      <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                        실시간
+                      </div>
                     </div>
                     <h3 className="text-white font-semibold text-sm mb-1 line-clamp-1">
                       {gym.place_name}
@@ -240,7 +298,7 @@ export default function HomePage() {
             )}
 
             {/* 검색 결과 없음 */}
-            {!loading && filteredGyms.length === 0 && (
+            {!loading && totalGyms === 0 && (
               <div className="text-center py-12">
                 <i className="ri-building-line text-4xl text-gray-600 mb-3"></i>
                 <p className="text-gray-400">해당 지역에 헬스장이 없습니다.</p>

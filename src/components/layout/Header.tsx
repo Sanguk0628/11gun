@@ -54,9 +54,6 @@ export default function Header({
               {title}
             </h1>
           </div>
-          <span className="text-gray-400 text-xs md:text-sm pb-0.5">
-            - 원정헬스 다모여
-          </span>
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-3 relative">

@@ -36,7 +36,7 @@ export default function LikedGymsPage() {
           if (error) {
             console.error('Error fetching liked gyms:', error);
           } else {
-            const gyms = data?.map(item => item.gyms).filter(Boolean) as Gym[];
+            const gyms = data?.map(item => item.gyms).filter(Boolean) as unknown as Gym[];
             setLikedGyms(gyms || []);
           }
         }

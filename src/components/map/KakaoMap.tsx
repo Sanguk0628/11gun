@@ -35,12 +35,20 @@ export default function KakaoMap({
     const initMap = async () => {
       try {
         // API 키가 설정되지 않은 경우 지도 로드 스킵
-        if (!process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY || 
-            process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY === 'your_kakao_map_api_key_here' ||
-            process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY === '') {
+        const mapApiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY;
+        if (!mapApiKey || 
+            mapApiKey === 'your_kakao_map_api_key_here' ||
+            mapApiKey === '') {
           console.log('카카오맵 API 키가 설정되지 않아 지도를 로드하지 않습니다.');
+          console.log('API 키 상태:', {
+            exists: !!mapApiKey,
+            length: mapApiKey?.length || 0,
+            isDefault: mapApiKey === 'your_kakao_map_api_key_here'
+          });
           return;
         }
+        
+        console.log('카카오맵 API 키 확인됨, 지도 로드 시작');
 
         await loadKakaoMapScript();
         
