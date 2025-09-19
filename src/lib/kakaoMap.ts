@@ -103,7 +103,6 @@ export const searchGyms = async (
     }
 
     console.log('카카오맵 API를 사용하여 실제 헬스장을 검색합니다.');
-    console.log('API 키:', process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY?.substring(0, 10) + '...');
 
     const result = await searchPlaces(
       `${location} 헬스장`,
@@ -113,21 +112,13 @@ export const searchGyms = async (
       2000 // 2km 반경
     );
 
-    console.log('검색 결과:', result);
-
-    if (result.documents && result.documents.length > 0) {
-      return result.documents.filter(place => 
-        place.category_group_code === 'CT1' && 
-        (place.place_name.includes('헬스') || 
-         place.place_name.includes('피트니스') ||
-         place.place_name.includes('짐') ||
-         place.place_name.includes('GYM') ||
-         place.place_name.includes('헬스장'))
-      );
-    } else {
-      console.log('검색 결과가 없어서 목업 데이터를 사용합니다.');
-      return getMockGyms(location);
-    }
+    return result.documents.filter(place => 
+      place.category_group_code === 'CT1' && 
+      (place.place_name.includes('헬스') || 
+       place.place_name.includes('피트니스') ||
+       place.place_name.includes('짐') ||
+       place.place_name.includes('GYM'))
+    );
   } catch (error) {
     console.error('헬스장 검색 오류:', error);
     // 오류 시에도 목업 데이터 반환
@@ -205,11 +196,11 @@ const getMockGyms = (location: string): KakaoPlace[] => {
     },
     {
       id: '6',
-      place_name: '짐타임 성수점',
+      place_name: '타임짐 성수점',
       category_name: '헬스장',
       category_group_code: 'CT1',
       phone: '02-1234-9999',
-      address_name: '서울시 성동구 성수동 123-45',
+      address_name: '서울시 성동구 성수1동 123-45',
       road_address_name: '서울시 성동구 성수일로 123',
       x: '127.0546',
       y: '37.5443',
